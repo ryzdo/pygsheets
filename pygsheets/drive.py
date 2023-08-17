@@ -4,7 +4,7 @@ from pygsheets.custom_types import ExportType
 from pygsheets.exceptions import InvalidArgumentValue, CannotRemoveOwnerError, FolderNotFound
 
 from googleapiclient import discovery
-from googleapiclient.http import MediaIoBaseDownload
+from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
 from googleapiclient.errors import HttpError
 
 import logging
@@ -301,6 +301,32 @@ class DriveAPIWrapper(object):
             sheet.index = tmp + 1
             if isinstance(sheet, Worksheet):
                 sheet.refresh(False)
+
+    def upload_file(self, path, title, file_format=None, folder=None, **kwargs):
+        """
+        Upload file data
+
+        Reference: `update request <https://developers.google.com/drive/v3/reference/files/create>`_
+
+        :param path:    Path to the file should be uploaded.
+        :param title:   New title of the file.
+        :param file_format:     File format (:class:`ExportType`)
+        :param folder:  The id of the folder this one will be stored in
+        :param kwargs:  Optional arguments. See reference for details.
+        """
+        body = {'name': title, 'mimeType': self._spreadsheet_mime_type}
+        if folder:
+            body['parents'] = [folder]
+
+        if not file_format:
+            file_extension = path.split(".")[-1]
+            file_format = getattr(ExportType, file_extension.upper())
+
+        mime_type = getattr(file_format, 'value', file_format).split(':')[0]
+
+        media = MediaFileUpload(path, mimetype=mime_type)
+
+        return self._execute_request(self.service.files().create(body=body, media_body=media, **kwargs))
 
     def create_permission(self, file_id, role, type, **kwargs):
         """Creates a permission for a file or a TeamDrive.
